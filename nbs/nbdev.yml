@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "deeplearning"
+  site-url: "https://pmaxit.github.io/deeplearning"
+  description: "Deep Learning Projects"
+  repo-branch: main
+  repo-url: "https://github.com/pmaxit/deeplearning"
