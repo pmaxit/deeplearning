@@ -3,10 +3,11 @@ project:
 
 format:
   html:
-    theme: cosmo
+    theme: cerulean
     css: styles.css
     toc: true
     keep-md: true
+    fontsize: 1.2em
   commonmark: default
 
 website:
@@ -16,7 +17,13 @@ website:
   navbar:
     background: primary
     search: true
+    align: left
+    padding: 1.5em
+    style: "font-size: 1.2em;"
   sidebar:
     style: floating
+    collapse-level: 1
+    align: left
+    padding-left: 2em
 
 metadata-files: [nbdev.yml, sidebar.yml]

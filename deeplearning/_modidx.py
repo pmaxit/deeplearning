@@ -5,4 +5,8 @@ d = { 'settings': { 'branch': 'main',
                 'doc_host': 'https://pmaxit.github.io',
                 'git_url': 'https://github.com/pmaxit/deeplearning',
                 'lib_path': 'deeplearning'},
-  'syms': {'deeplearning.core': {'deeplearning.core.foo': ('core.html#foo', 'deeplearning/core.py')}}}
+  'syms': { 'deeplearning.core': { 'deeplearning.core.HelloSayer': ('core.html#hellosayer', 'deeplearning/core.py'),
+                                   'deeplearning.core.HelloSayer.__init__': ('core.html#hellosayer.__init__', 'deeplearning/core.py'),
+                                   'deeplearning.core.HelloSayer.say': ('core.html#hellosayer.say', 'deeplearning/core.py'),
+                                   'deeplearning.core.foo': ('core.html#foo', 'deeplearning/core.py'),
+                                   'deeplearning.core.say_hello': ('core.html#say_hello', 'deeplearning/core.py')}}}

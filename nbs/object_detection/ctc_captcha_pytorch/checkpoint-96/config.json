@@ -1,0 +1,8 @@
+{
+  "architectures": [
+    "CTCModel"
+  ],
+  "num_classes": 37,
+  "torch_dtype": "float32",
+  "transformers_version": "4.51.2"
+}

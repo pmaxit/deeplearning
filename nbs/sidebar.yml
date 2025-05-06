@@ -1,0 +1,10 @@
+website:
+  sidebar:
+    contents:
+      - section: development
+        contents:
+          - development/00_core.ipynb
+        href: development/index.ipynb
+      - section: object_detection
+        contents:
+          - object_detection/004_objectdetection_fastai.ipynb
