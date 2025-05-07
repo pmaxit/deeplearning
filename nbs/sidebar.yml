@@ -5,5 +5,3 @@ website:
         contents:
           - object_detection/004_objectdetection_fastai.ipynb
           - object_detection/005_objectdetection_fastai.ipynb
-
-        href: object_detection/004_objectdetection_fastai.ipynb
