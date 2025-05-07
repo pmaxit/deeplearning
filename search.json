@@ -1,0 +1,167 @@
+[
+  {
+    "objectID": "object_detection/objectdetection_fastai.html",
+    "href": "object_detection/objectdetection_fastai.html",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "",
+    "text": "Ever wonder how those distorted text challenges called CAPTCHAs work—and how we might teach computers to solve them? Today we’re diving into a practical machine learning project that combines computer vision and sequence recognition to crack this fascinating problem.",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#the-big-picture-why-captchas-matter",
+    "href": "object_detection/objectdetection_fastai.html#the-big-picture-why-captchas-matter",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "The Big Picture: Why CAPTCHAs Matter",
+    "text": "The Big Picture: Why CAPTCHAs Matter\nBefore we get into the code, let’s understand what we’re really doing here. CAPTCHA recognition isn’t just about bypassing security measures (which you shouldn’t do without permission!). It’s about solving a fundamental AI challenge: teaching machines to perceive and interpret visual sequences much like humans do.\nThis project demonstrates a powerful pattern in machine learning: breaking complex problems into specialized sub-tasks. Rather than building one massive model to handle everything, we’ll use specialized components that excel at different aspects of the problem.",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#what-will-we-learn-today",
+    "href": "object_detection/objectdetection_fastai.html#what-will-we-learn-today",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "What will we learn today",
+    "text": "What will we learn today\n\nImage processing: Handling and transforming image data.\nDeep learning architectures: Combining Convolutional Neural Networks (CNNs) for feature extraction and Recurrent Neural Networks (RNNs) for sequence processing.\nSpecialized loss functions: Like Connectionist Temporal Classification (CTC) loss, which is essential for sequence-to-sequence tasks where alignment is unknown.\n\nThis notebook focuses on building such a model for educational purposes, demonstrating a powerful approach to sequence recognition in images.",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#the-architecture-cnn-lstm-ctc",
+    "href": "object_detection/objectdetection_fastai.html#the-architecture-cnn-lstm-ctc",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "The Architecture: CNN + LSTM + CTC",
+    "text": "The Architecture: CNN + LSTM + CTC\nOur solution uses three key elements:\n\nConvolutional Neural Networks (CNNs) to process the image\nLong Short-Term Memory networks (LSTMs) to interpret the sequence\nConnectionist Temporal Classification (CTC) to handle alignment uncertainty\n\nLet’s see how these pieces work together using fast.ai and PyTorch.",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#objective-of-this-notebook",
+    "href": "object_detection/objectdetection_fastai.html#objective-of-this-notebook",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Objective of this notebook",
+    "text": "Objective of this notebook\n\nGenerate a synthetic dataset of CAPTCHA images and their corresponding text labels.\nPreprocess the data into a format suitable for training a deep learning model using fastai.\nDefine and implement a CRNN model architecture tailored for CAPTCHA recognition.\nUtilize CTC loss for training the model, which handles variable-length predictions.\nTrain the model using fastai’s Learner and best practices like learning rate finding and one-cycle policy.\nVisualize and evaluate the model’s performance.\n\n\nfrom fastai.vision.all import *\nfrom fastai.text.all import *\nfrom datasets import Dataset\nfrom captcha.image import ImageCaptcha\nimport random\nimport string\n\n\nfrom src.utils import *\nfrom src.metrics import *",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#step-1-creating-our-dataloaders",
+    "href": "object_detection/objectdetection_fastai.html#step-1-creating-our-dataloaders",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Step 1: Creating Our DataLoaders",
+    "text": "Step 1: Creating Our DataLoaders\nFor dataloaders, we need to create data types. Since, we wanted to use Transformation pipeline which converts tensors from objects and viceversa. It’s advisable to create a custom Transform to handle labels\n\nclass CaptchaStr(str):\n    def show(self, ctx=None, **kwargs):\n        return show_title(self, ctx=ctx)\n\nclass TokenizeLabel(Transform):\n    vocab = list(string.ascii_uppercase + string.digits)\n    def __init__(self):\n        self.stoi = {v: k for k, v in enumerate(self.vocab)}\n\n    def encodes(self, x: str):\n        return TensorText(tensor([self.stoi[c] for c in x]))\n\n    def decodes(self, x: TensorText):\n        indices = x.detach().cpu().flatten().tolist()\n        return CaptchaStr(''.join(self.vocab[int(i)] for i in indices))\n\n\ndblock = DataBlock(\n    blocks=(ImageBlock, TransformBlock(type_tfms=TokenizeLabel())),\n    get_x=lambda o: o['image'],\n    get_y=lambda o: o['label'],  # Already a CaptchaLabel instance\n    splitter=RandomSplitter(),\n    item_tfms=None,\n    batch_tfms=[Normalize()]\n)\n\n# 7. Create DataLoaders\ndls = dblock.dataloaders(ds, bs=16)\n\n\nblocks=(ImageBlock, TransformBlock(type_tfms=TokenizeLabel())): This tells fastai that each item in our dataset consists of two parts: an image (handled by ImageBlock) and a label that needs to be processed by our TokenizeLabel transform.\n\nget_x=lambda o: o['image']: A function to extract the input (image) from a dataset item o.\nget_y=lambda o: o['label']: A function to extract the target (label) from a dataset item o.\nsplitter=RandomSplitter(): Specifies that the data should be randomly split into training and validation sets.\nitem_tfms=None: We are not applying any item-level transforms here (like resizing individual images) because our images are already generated at the correct size. TokenizeLabel is a type_tfms which acts on the type.\nbatch_tfms=[Normalize()]: Batch-level transforms are applied to a whole batch of data at once. Normalize standardizes the pixel values of the images in the batch using ImageNet statistics by default.\ndls = dblock.dataloaders(ds, bs=16): This line actually creates the DataLoaders from our Hugging Face dataset ds with a batch size of 16.\n\n\n\ndls.show_batch()",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#step-2-the-cnn-backbone---our-visual-feature-extractor",
+    "href": "object_detection/objectdetection_fastai.html#step-2-the-cnn-backbone---our-visual-feature-extractor",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Step 2: The CNN Backbone - Our Visual Feature Extractor",
+    "text": "Step 2: The CNN Backbone - Our Visual Feature Extractor\n\nCNNBackbone(nn.Module): This class defines the Convolutional Neural Network part of our CRNN.\n\nIt consists of four convolutional blocks (conv_block1 to conv_block4). Each block typically includes:\n\nnn.Conv2d: 2D convolution layer to learn spatial features.\nnn.BatchNorm2d: Batch normalization to stabilize and speed up training.\nnn.ReLU: ReLU activation function.\nnn.MaxPool2d: Max pooling to downsample the feature maps and make the model more robust to variations in position.\nThe comments indicate the change in feature map dimensions after each pooling layer.\nself.adaptive_pool = nn.AdaptiveAvgPool2d((1, 40)): This is a key layer. After the convolutional blocks, the feature map has a certain height and width. This adaptive pooling layer resizes the height to 1 while keeping the width at 40 (or forcing it to 40). This transforms the 2D feature map into a sequence of feature vectors, which is the required input format for the subsequent RNN. The output shape will be [batch_size, num_channels, 1, sequence_width].\nThe forward method defines how input x flows through these blocks.\n\n\n\n\n# 7. Improved CNN Backbone\nclass CNNBackbone(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # First conv block (input: 3x60x160)\n        self.conv_block1 = nn.Sequential(\n            nn.Conv2d(3, 64, kernel_size=3, padding=1),\n            nn.BatchNorm2d(64),\n            nn.ReLU(inplace=True),\n            nn.MaxPool2d(2, 2)  # 60x160 -&gt; 30x80\n        )\n        # Second conv block\n        self.conv_block2 = nn.Sequential(\n            nn.Conv2d(64, 128, kernel_size=3, padding=1),\n            nn.BatchNorm2d(128),\n            nn.ReLU(inplace=True),\n            nn.MaxPool2d(2, 2)  # 30x80 -&gt; 15x40\n        )\n        # Third conv block\n        self.conv_block3 = nn.Sequential(\n            nn.Conv2d(128, 256, kernel_size=3, padding=1),\n            nn.BatchNorm2d(256),\n            nn.ReLU(inplace=True),\n            nn.Conv2d(256, 256, kernel_size=3, padding=1),  # Added an extra conv layer\n            nn.BatchNorm2d(256),\n            nn.ReLU(inplace=True),\n            nn.MaxPool2d(kernel_size=(2,1), stride=(2,1))  # 15x40 -&gt; 7x40\n        )\n        # Fourth conv block\n        self.conv_block4 = nn.Sequential(\n            nn.Conv2d(256, 512, kernel_size=3, padding=1),\n            nn.BatchNorm2d(512),\n            nn.ReLU(inplace=True),\n            nn.Conv2d(512, 512, kernel_size=3, padding=1),  # Added an extra conv layer\n            nn.BatchNorm2d(512),\n            nn.ReLU(inplace=True),\n            nn.Dropout2d(0.2),\n            nn.MaxPool2d(kernel_size=(2,1), stride=(2,1))  # 7x40 -&gt; 3x40\n        )\n        # Reduce height to 1, keep width\n        self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 40))  # Force output width to be 40\n\n    def forward(self, x):\n        x = self.conv_block1(x)\n        x = self.conv_block2(x)\n        x = self.conv_block3(x)\n        x = self.conv_block4(x)\n        x = self.adaptive_pool(x)\n        return x\n\nNotice how we’re gradually reducing the height while preserving the width—this transforms the 2D image into a 1D sequence of features, perfect for our LSTM to process.",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#step-3-the-crnn-model---combining-vision-and-sequence-processing",
+    "href": "object_detection/objectdetection_fastai.html#step-3-the-crnn-model---combining-vision-and-sequence-processing",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Step 3: The CRNN Model - Combining Vision and Sequence Processing",
+    "text": "Step 3: The CRNN Model - Combining Vision and Sequence Processing\nNow we connect the CNN to an LSTM to handle the sequential nature of text:\n\nclass CRNN(nn.Module):\n    def __init__(self, num_chars):\n        super().__init__()\n        self.cnn = CNNBackbone()\n        # CNN output: [bs, 512, 1, 40]\n        lstm_input_size = 512\n        hidden_size = 256\n        self.num_chars = num_chars\n\n        # Bidirectional LSTM layers\n        self.lstm = nn.LSTM(\n            lstm_input_size,\n            hidden_size,\n            num_layers=2,\n            bidirectional=True,\n            batch_first=False,\n            dropout=0.2\n        )\n\n        # Initialize LSTM parameters with better values\n        for name, param in self.lstm.named_parameters():\n            if 'weight_ih' in name:\n                nn.init.xavier_uniform_(param)\n            elif 'weight_hh' in name:\n                nn.init.orthogonal_(param)\n            if 'bias' in name:\n                nn.init.zeros_(param)\n                # Set forget gate bias to 1 (helps with vanishing gradients)\n                n = param.size(0)\n                param.data[n//4:n//2].fill_(1.0)\n\n        # Output layer\n        self.fc = nn.Linear(hidden_size * 2, num_chars + 1)  # +1 for blank\n\n        # Initialize output layer with better values\n        nn.init.xavier_uniform_(self.fc.weight)\n        nn.init.zeros_(self.fc.bias)\n\n        # CRITICAL: Set bias against blank prediction\n        # This helps prevent the \"blank collapse\" problem\n        with torch.no_grad():\n            self.fc.bias[num_chars] = -2.0  # Strong negative bias for blank\n            # Give a slight positive bias to actual characters\n            for i in range(num_chars):\n                self.fc.bias[i] = 0.5  # Small positive bias for real characters\n\n    def forward(self, images):\n        # Extract CNN features\n        features = self.cnn(images)  # [bs, 512, 1, 40]\n        bs, C, H, W_seq = features.size()\n        assert H == 1, \"CNN output height must be 1\"\n\n        # Reshape for LSTM: [seq_len, batch_size, features]\n        features = features.squeeze(2)      # [bs, 512, 40]\n        features = features.permute(2, 0, 1)  # [40, bs, 512]\n\n        # Pass through LSTM\n        lstm_out, _ = self.lstm(features)  # [40, bs, 512]\n\n        # Pass through final linear layer\n        logits = self.fc(lstm_out)  # [40, bs, num_chars+1]\n\n        # Apply log softmax for CTC loss\n        log_probs = F.log_softmax(logits, dim=2)\n\n        # Debug prints - uncomment to see activation distributions\n        # print(f\"Logits min: {logits.min().item()}, max: {logits.max().item()}, mean: {logits.mean().item()}\")\n        # print(f\"Log_probs min: {log_probs.min().item()}, max: {log_probs.max().item()}, mean: {log_probs.mean().item()}\")\n\n        return log_probs",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#step-4-ctc-loss---the-special-sauce",
+    "href": "object_detection/objectdetection_fastai.html#step-4-ctc-loss---the-special-sauce",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Step 4: CTC Loss - The Special Sauce",
+    "text": "Step 4: CTC Loss - The Special Sauce\nThe key insight: we don’t know exactly which parts of the image correspond to which characters. CTC loss solves this alignment problem:\n\nclass CTCLossFlat(nn.Module):\n    def __init__(self, blank_token=0, pad_token=-1):\n        super().__init__()\n        self.blank_token = blank_token\n        self.pad_token = pad_token\n        self.ctc = nn.CTCLoss(blank=blank_token, reduction='mean', zero_infinity=True)\n\n    def forward(self, log_probs, targets):\n        \"\"\"\n        log_probs: [T, B, C] — already in CTC-ready shape\n        targets:   [B, S] — padded label indices\n        \"\"\"\n        T, B, C = log_probs.shape  # ✅ correct: T = 40, B = 16\n    \n        # Input lengths = full time steps (T) for each batch\n        input_lengths = torch.full((B,), T, dtype=torch.long, device=log_probs.device)\n    \n        # Target lengths = number of non-pad tokens\n        target_lengths = (targets != self.pad_token).sum(dim=1)\n    \n        # Flatten targets\n        targets_flat = torch.cat([t[t != self.pad_token] for t in targets])\n    \n\n        return self.ctc(log_probs, targets_flat, input_lengths, target_lengths)\n\n    def activation(self, x):\n        return F.log_softmax(x, dim=-1)\n\n    def decodes(self, x):\n            if x.ndim == 3: x = x.permute(1, 0, 2)  # [B, T, C]\n            preds = x.argmax(-1)  # [B, T]\n    \n            decoded = []\n            for pred in preds:\n                tokens = []\n                prev = self.blank_token\n                for p in pred.cpu().tolist():\n                    if p != prev and p != self.blank_token:\n                        tokens.append(p)\n                    prev = p\n                decoded.append(tokens)\n            \n            # Pad sequences to max length in batch and wrap in TensorText\n            max_len = max(len(seq) for seq in decoded)\n            padded = torch.full((len(decoded), max_len), self.pad_token, device=x.device)\n            for i, seq in enumerate(decoded):\n                padded[i, :len(seq)] = torch.tensor(seq, device=x.device)\n            \n            return TensorText(padded)  # 🔑 Wrap in TensorText",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#step-5-training-with-fast.ai",
+    "href": "object_detection/objectdetection_fastai.html#step-5-training-with-fast.ai",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Step 5: Training with fast.ai",
+    "text": "Step 5: Training with fast.ai\n\nmodel = CRNN(len(dls.vocab))\nloss_func = CTCLossFlat(blank_token = 0)\n\ndef split_params(model):\n    return [\n        params(model.cnn),         # CNN layers - lower learning rate\n        params(model.lstm),        # LSTM layers - medium learning rate\n        params(model.fc)           # Final layer - higher learning rate\n    ]\n\n\nlearn = Learner(\n        dls,\n        model,\n        loss_func=loss_func,\n        splitter=split_params,\n        metrics=[CTCAccuracy(CTCDecoder(dls.vocab))],\n        wd=1e-3  # Reduced weight decay\n)\n\n\nlearn.lr_find()\n\n\n\n\n\n\n\n\nSuggestedLRs(valley=0.0012022644514217973)\n\n\n\n\n\n\n\n\n\n\nlearn.fit_one_cycle(20, 1e-3)\n\n\n\n\n\n\n\n\nepoch\ntrain_loss\nvalid_loss\nacc\ntime\n\n\n\n\n0\n5.699660\n3.764331\n0.000000\n00:02\n\n\n1\n4.239408\n3.723870\n0.000000\n00:02\n\n\n2\n3.860534\n3.732362\n0.000000\n00:02\n\n\n3\n3.752717\n3.730798\n0.000000\n00:02\n\n\n4\n3.686547\n3.760492\n0.000000\n00:02\n\n\n5\n3.657431\n3.810178\n0.000000\n00:02\n\n\n6\n3.580733\n3.506015\n0.000000\n00:02\n\n\n7\n3.364519\n3.111249\n0.000000\n00:02\n\n\n8\n2.587488\n1.889174\n0.000000\n00:02\n\n\n9\n1.400702\n0.675926\n0.255000\n00:03\n\n\n10\n0.690853\n0.276990\n0.525000\n00:02\n\n\n11\n0.302762\n0.185821\n0.645000\n00:02\n\n\n12\n0.118915\n0.184782\n0.600000\n00:02\n\n\n13\n0.032536\n0.119765\n0.680000\n00:02\n\n\n14\n-0.026286\n0.020610\n0.825000\n00:02\n\n\n15\n-0.056000\n0.022658\n0.830000\n00:02\n\n\n16\n-0.079878\n0.002679\n0.840000\n00:02\n\n\n17\n-0.090317\n0.006475\n0.820000\n00:02\n\n\n18\n-0.095821\n0.002284\n0.840000\n00:02\n\n\n19\n-0.098768\n0.001344\n0.855000\n00:02\n\n\n\n\n\n\nfrom plum import dispatch\n\n@dispatch\ndef show_results(x:TensorImage, y:TensorText, samples, outs, ctxs=None, max_n=6, **kwargs):\n    \n    # ctxs = get_grid(min(len(samples), max_n)) if not ctxs else ctxs\n    if ctxs is None: ctxs = get_grid(min(len(samples), max_n))\n\n    for i, ((img, tgt), pred) in enumerate(zip(samples, outs)):\n        ctx = ctxs[i]\n        img.show(ctx=ctx)\n        \n        # Decode target and prediction from TensorText\n        tgt_str = CaptchaStr(tgt)\n        pred_str = CaptchaStr(pred[0])\n        \n        ctx.set_title(f\"Actual: {tgt_str}\\nPred: {pred_str}\", fontsize=8)\n    \n    return ctxs\n\n\nlearn.show_results()\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThe model correctly identifies most CAPTCHAs, even with significant distortion and overlapping characters!",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#the-machine-learning-mindset",
+    "href": "object_detection/objectdetection_fastai.html#the-machine-learning-mindset",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "The Machine Learning Mindset",
+    "text": "The Machine Learning Mindset\nWhat makes this approach successful isn’t just the specific code, but the problem-solving pattern:\n\nDivide and conquer: Separate image recognition from sequence interpretation\nChoose specialized tools: CNNs for visual features, LSTMs for sequences\nHandle uncertainty: Use CTC loss to manage the alignment problem\nSmart initialization: Bias the model against blank predictions to avoid “blank collapse”\nFine-tune learning rates: Use different rates for different components\n\nThis same pattern can help solve many complex machine learning challenges:\n\nOCR for documents\nSpeech recognition\nVideo action recognition\nMedical time series analysis",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#going-further",
+    "href": "object_detection/objectdetection_fastai.html#going-further",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Going Further",
+    "text": "Going Further\nWant to improve this model? Consider:\n\nData augmentation (rotation, noise, blur) for more robust training\nTrying transformer architectures instead of LSTM\nExploring beam search during decoding\nTesting on real-world CAPTCHAs (ethically, of course!)\n\nRemember, the most valuable skill in machine learning isn’t memorizing architectures—it’s knowing how to decompose problems and connect specialized components in ways that leverage their strengths.\nWhat machine learning challenge are you working on? Let me know in the comments!\n\nProcessing medical imaging data with annotations",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "object_detection/objectdetection_fastai.html#thinking-like-a-machine-learning-engineer",
+    "href": "object_detection/objectdetection_fastai.html#thinking-like-a-machine-learning-engineer",
+    "title": "Breaking CAPTCHAs with Deep Learning: A fast.ai Approach",
+    "section": "Thinking Like a Machine Learning Engineer",
+    "text": "Thinking Like a Machine Learning Engineer\nThe next time you face a complex ML problem, remember this approach:\n\nWhat are the sub-problems?\nWhat type of neural network is best for each part?\nHow do these parts need to talk to each other?\nWhat’s the right way to measure success?\n\nBy breaking down big problems into manageable pieces, even the most intimidating challenges become approachable.\nSo next time a CAPTCHA asks you to “prove you’re human,” you can smile knowing that the line between human and machine intelligence continues to blur—one squiggly character at a time.\nWhat machine learning challenge are you tackling? Share in the comments below!",
+    "crumbs": [
+      "object_detection"
+    ]
+  },
+  {
+    "objectID": "development/core.html",
+    "href": "development/core.html",
+    "title": "core",
+    "section": "",
+    "text": "source\n\nfoo\n\n foo ()\n\n\nsource\n\n\nsay_hello\n\n say_hello (to)\n\nsay hello to somebody\n\nsource\n\n\nHelloSayer\n\n HelloSayer (to)\n\nSay hello to to using say_hello"
+  },
+  {
+    "objectID": "development/index.html",
+    "href": "development/index.html",
+    "title": "deeplearning",
+    "section": "",
+    "text": "import sys\nsys.path.append('../')\nThis file will become your README and also the index of your documentation."
+  },
+  {
+    "objectID": "development/index.html#developer-guide",
+    "href": "development/index.html#developer-guide",
+    "title": "deeplearning",
+    "section": "Developer Guide",
+    "text": "Developer Guide\nIf you are new to using nbdev here are some useful pointers to get you started.\n\nInstall deeplearning in Development mode\n# make sure deeplearning package is installed in development mode\n$ pip install -e .\n\n# make changes under nbs/ directory\n# ...\n\n# compile to have changes apply to deeplearning\n$ nbdev_prepare"
+  },
+  {
+    "objectID": "development/index.html#usage",
+    "href": "development/index.html#usage",
+    "title": "deeplearning",
+    "section": "Usage",
+    "text": "Usage\n\nInstallation\nInstall latest from the GitHub repository:\n$ pip install git+https://github.com/pmaxit/deeplearning.git\nor from conda\n$ conda install -c pmaxit deeplearning\nor from pypi\n$ pip install deeplearning\n\n\nDocumentation\nDocumentation can be found hosted on this GitHub repository’s pages. Additionally you can find package manager specific guidelines on conda and pypi respectively."
+  },
+  {
+    "objectID": "development/index.html#how-to-use",
+    "href": "development/index.html#how-to-use",
+    "title": "deeplearning",
+    "section": "How to use",
+    "text": "How to use\nFill me in please! Don’t forget code examples:\n\nsay_hello('Issac')\n\n'Hello Issac'\n\n\n\nHelloSayer\n\ndeeplearning.core.HelloSayer"
+  }
+]
